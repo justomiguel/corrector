@@ -28,7 +28,7 @@ public class CSVWriter {
             // If there are only three names, keep the second CSV field empty
             csvLine = String.format("%s,%s,%s,%s,%d,%d,%d,%d,%d,%s\n",
                     nameComponents[0], "", nameComponents[1], nameComponents[2],
-                    score.notaInicio, score.notaImagenes, score.notaForm, score.notaHtml, score.notaFinal, score.comentarios);
+                    score.notaInicio, score.notaImagenes, score.notaForm, score.notaHtml, score.notaFinal, "\""+score.comentarios+ "\"");
         } else {
             // If there are four names, separate each into the CSV fields
             // Ensure that there are at least four components, fill the missing ones with an empty string if necessary

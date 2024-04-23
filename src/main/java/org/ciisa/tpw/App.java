@@ -44,11 +44,21 @@ public class App {
     }
 
     private static void extractAndProcessFile(File file, CSVWriter csvWriter, String dirName) throws InterruptedException, IOException {
-        String tempDirPath = Files.createTempDirectory("extract").toString();
-        File tempDir = new File(tempDirPath);
+        // El destino se establece como el directorio padre del archivo comprimido
+        File destDir = file.getParentFile();
+
+        // Limpieza inicial: eliminar todo excepto .zip y .rar
+        File[] filesInDestDir = destDir.listFiles();
+        if (filesInDestDir != null) {
+            for (File existingFile : filesInDestDir) {
+                if (!existingFile.getName().endsWith(".zip") && !existingFile.getName().endsWith(".rar")) {
+                    deleteFileOrDirectory(existingFile);
+                }
+            }
+        }
 
         // Intentamos primero con el comando de 7zip
-        String command = String.format("7z x \"%s\" -o\"%s\" -y", file.getAbsolutePath(), tempDir.getAbsolutePath());
+        String command = String.format("7z x \"%s\" -o\"%s\" -y", file.getAbsolutePath(), destDir.getAbsolutePath());
         Process process = Runtime.getRuntime().exec(command);
         try {
             int exitCode = process.waitFor();
@@ -58,7 +68,7 @@ public class App {
         } catch (IOException | InterruptedException e) {
             System.out.println("7z failed, trying with Apache Commons Compress: " + e.getMessage());
             if (file.getName().endsWith(".zip")) {
-                unzipUsingCommonsCompress(file, tempDir);
+                unzipUsingCommonsCompress(file, destDir);
             } else {
                 throw new IOException("Unsupported archive format for fallback: " + file.getName());
                 // For RAR files, an additional method with support for RAR extraction should be implemented.
@@ -66,12 +76,12 @@ public class App {
         }
 
         // Identificar si los archivos HTML están directamente en tempDir o en una subcarpeta
-        File[] htmlFiles = tempDir.listFiles((d, name) -> name.endsWith(".html"));
-        File validationDirectory = tempDir;
+        File[] htmlFiles = destDir.listFiles((d, name) -> name.endsWith(".html"));
+        File validationDirectory = destDir;
 
         if (htmlFiles == null || htmlFiles.length == 0) {
             // No HTML files at the root, check for a single directory ignoring __MACOSX
-            File[] directories = tempDir.listFiles(File::isDirectory);
+            File[] directories = destDir.listFiles(File::isDirectory);
             File[] validDirectories = Arrays.stream(directories)
                     .filter(dir -> !dir.getName().equals("__MACOSX"))
                     .toArray(File[]::new);
@@ -85,6 +95,22 @@ public class App {
         HTMLValidator validator = new HTMLValidator(validationDirectory);
         Score score = validator.validate();
         csvWriter.writeLine(dirName, score);
+    }
+
+    // Método de utilidad para eliminar archivos y directorios
+// Utiliza recursividad para eliminar directorios no vacíos
+    private static void deleteFileOrDirectory(File fileOrDirectoryToDelete) {
+        if (fileOrDirectoryToDelete.isDirectory()) {
+            File[] allContents = fileOrDirectoryToDelete.listFiles();
+            if (allContents != null) {
+                for (File file : allContents) {
+                    deleteFileOrDirectory(file);
+                }
+            }
+        }
+        if (!fileOrDirectoryToDelete.delete()) {
+            System.err.println("Unable to delete file or directory: " + fileOrDirectoryToDelete.getAbsolutePath());
+        }
     }
 
     // Método agregado para descomprimir archivos ZIP usando Apache Commons Compress
